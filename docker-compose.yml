@@ -1,0 +1,82 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${DB_PWD}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - 5431:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  test_db:
+    image: postgres:latest
+    container_name: postgres_test_db
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${TEST_DB_PWD}
+      POSTGRES_USER: ${TEST_DB_USER}
+      POSTGRES_DB: ${TEST_DB_NAME}
+    volumes:
+      - test_pg_data:/var/lib/postgresql/data
+    ports:
+      - 5433:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_DB_USER} -d ${TEST_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin_container
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - 8080:80
+    depends_on:
+      db:
+        condition: service_healthy
+      test_db:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+#  app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: fastapi_app
+#    restart: always
+#    environment:
+#      - DB_HOST=${DB_HOST}
+#      - DB_PORT=${DB_PORT}
+#      - DB_NAME=${DB_NAME}
+#      - DB_USER=${DB_USER}
+#      - DB_PWD=${DB_PWD}
+#      - TEST_DB_HOST=${TEST_DB_HOST}
+#      - TEST_DB_PORT=${TEST_DB_PORT}
+#      - TEST_DB_NAME=${TEST_DB_NAME}
+#      - TEST_DB_USER=${TEST_DB_USER}
+#      - TEST_DB_PWD=${TEST_DB_PWD}
+#    ports:
+#      - 8000:8000
+#    depends_on:
+#      db:
+#        condition: service_healthy
+
+
+volumes:
+  pg_data:
+  test_pg_data:
+  pgadmin_data:
