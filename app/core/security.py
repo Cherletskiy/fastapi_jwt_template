@@ -37,8 +37,10 @@ class AuthService:
         return AuthService.create_token(data, "refresh", timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
 
     @staticmethod
-    def decode_token(token: str, expected_type: str = "access") -> dict:
+    def decode_token(token: str | bytes, expected_type: str = "access") -> dict:
         try:
+            if isinstance(token, str):
+                token = token.encode('utf-8')
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             token_type = payload.get("type")
             if token_type != expected_type:

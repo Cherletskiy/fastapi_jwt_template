@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,4 +38,10 @@ async def get_current_user(
     return user
 
 
+async def get_refresh_token(refresh_token: str | None = Cookie(default=None)):
+    if refresh_token is None:
+        logger.warning("No refresh_token in cookie")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token provided")
+    logger.debug(f"Extracted refresh_token from cookie: {refresh_token}")
+    return refresh_token
 
