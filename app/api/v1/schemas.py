@@ -9,8 +9,14 @@ class UserCreate(BaseModel):
 
     @field_validator("password")
     def password_strength(cls, v):
-        if len(v) < 8 or not any(c.isupper() for c in v) or not any(c.isdigit() for c in v):
-            raise ValueError("Password must be at least 8 characters with uppercase and digit")
+        if (
+            len(v) < 8
+            or not any(c.isupper() for c in v)
+            or not any(c.isdigit() for c in v)
+        ):
+            raise ValueError(
+                "Password must be at least 8 characters with uppercase and digit"
+            )
         return v
 
     model_config = ConfigDict(extra="forbid")
@@ -37,4 +43,3 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
     model_config = ConfigDict(extra="forbid")
-

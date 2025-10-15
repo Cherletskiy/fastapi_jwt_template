@@ -19,7 +19,7 @@ def mock_user():
         username="testuser",
         email="test@example.com",
         hashed_password="hashed_password_123",
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
 
 
@@ -35,10 +35,12 @@ def valid_refresh_token(mock_user):
 
 class TestAuthEndpoints:
 
-    @patch('app.api.v1.auth.UserService.get_user_by_email')
-    @patch('app.api.v1.auth.UserService.create_user')
-    @patch('app.api.v1.auth.AuthService.get_password_hash')
-    def test_register_success(self, mock_hash, mock_create_user, mock_get_user, mock_user):
+    @patch("app.api.v1.auth.UserService.get_user_by_email")
+    @patch("app.api.v1.auth.UserService.create_user")
+    @patch("app.api.v1.auth.AuthService.get_password_hash")
+    def test_register_success(
+        self, mock_hash, mock_create_user, mock_get_user, mock_user
+    ):
         mock_get_user.return_value = None
         mock_hash.return_value = "hashed_password_123"
         mock_create_user.return_value = mock_user
@@ -46,7 +48,7 @@ class TestAuthEndpoints:
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "StrongPass123"
+            "password": "StrongPass123",
         }
 
         response = client.post("/api/v1/auth/register", json=user_data)
@@ -57,14 +59,14 @@ class TestAuthEndpoints:
         assert "id" in response.json()
         assert "created_at" in response.json()
 
-    @patch('app.api.v1.auth.UserService.get_user_by_email')
+    @patch("app.api.v1.auth.UserService.get_user_by_email")
     def test_register_existing_email(self, mock_get_user, mock_user):
         mock_get_user.return_value = mock_user
 
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "StrongPass123"
+            "password": "StrongPass123",
         }
 
         response = client.post("/api/v1/auth/register", json=user_data)
@@ -76,20 +78,17 @@ class TestAuthEndpoints:
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "weak"
+            "password": "weak",
         }
 
         response = client.post("/api/v1/auth/register", json=user_data)
         assert response.status_code == 422
 
-    @patch('app.api.v1.auth.UserService.authenticate_user')
+    @patch("app.api.v1.auth.UserService.authenticate_user")
     def test_login_success(self, mock_authenticate, mock_user):
         mock_authenticate.return_value = mock_user
 
-        login_data = {
-            "email": "test@example.com",
-            "password": "correct_password"
-        }
+        login_data = {"email": "test@example.com", "password": "correct_password"}
 
         response = client.post("/api/v1/auth/login", json=login_data)
 
@@ -98,29 +97,23 @@ class TestAuthEndpoints:
         assert response.json()["token_type"] == "bearer"
         assert "refresh_token" in response.cookies
 
-    @patch('app.api.v1.auth.UserService.authenticate_user')
+    @patch("app.api.v1.auth.UserService.authenticate_user")
     def test_login_invalid_credentials(self, mock_authenticate):
         mock_authenticate.return_value = None
 
-        login_data = {
-            "email": "test@example.com",
-            "password": "wrong_password"
-        }
+        login_data = {"email": "test@example.com", "password": "wrong_password"}
 
         response = client.post("/api/v1/auth/login", json=login_data)
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid credentials"
 
     def test_login_invalid_data(self):
-        login_data = {
-            "email": "invalid-email",
-            "password": "pass"
-        }
+        login_data = {"email": "invalid-email", "password": "pass"}
 
         response = client.post("/api/v1/auth/login", json=login_data)
         assert response.status_code == 422
 
-    @patch('app.core.dependencies.AuthService.get_current_user')
+    @patch("app.core.dependencies.AuthService.get_current_user")
     def test_get_me_success(self, mock_get_current_user, mock_user, valid_access_token):
         mock_get_current_user.return_value = mock_user
 
@@ -140,7 +133,7 @@ class TestAuthEndpoints:
         response = client.get("/api/v1/auth/me", headers=headers)
         assert response.status_code == 401
 
-    @patch('app.core.dependencies.AuthService.get_current_user')
+    @patch("app.core.dependencies.AuthService.get_current_user")
     def test_logout_success(self, mock_get_current_user, mock_user, valid_access_token):
         mock_get_current_user.return_value = mock_user
 
@@ -155,8 +148,10 @@ class TestAuthEndpoints:
         assert "refresh_token" in set_cookie_header
         assert "Max-Age=0" in set_cookie_header
 
-    @patch('app.core.dependencies.AuthService.get_current_user')
-    def test_refresh_token_success(self, mock_get_current_user, mock_user, valid_refresh_token):
+    @patch("app.core.dependencies.AuthService.get_current_user")
+    def test_refresh_token_success(
+        self, mock_get_current_user, mock_user, valid_refresh_token
+    ):
         mock_get_current_user.return_value = mock_user
 
         cookies = {"refresh_token": valid_refresh_token}
@@ -230,11 +225,18 @@ class TestSecurityUtils:
 
 class TestAuthIntegration:
 
-    @patch('app.api.v1.auth.UserService.get_user_by_email')
-    @patch('app.api.v1.auth.UserService.create_user')
-    @patch('app.api.v1.auth.UserService.authenticate_user')
-    @patch('app.core.dependencies.AuthService.get_current_user')
-    def test_full_auth_flow(self, mock_get_current_user, mock_authenticate, mock_create_user, mock_get_user, mock_user):
+    @patch("app.api.v1.auth.UserService.get_user_by_email")
+    @patch("app.api.v1.auth.UserService.create_user")
+    @patch("app.api.v1.auth.UserService.authenticate_user")
+    @patch("app.core.dependencies.AuthService.get_current_user")
+    def test_full_auth_flow(
+        self,
+        mock_get_current_user,
+        mock_authenticate,
+        mock_create_user,
+        mock_get_user,
+        mock_user,
+    ):
         mock_get_user.return_value = None
         mock_create_user.return_value = mock_user
         mock_authenticate.return_value = mock_user
@@ -243,16 +245,13 @@ class TestAuthIntegration:
         register_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "StrongPass123"
+            "password": "StrongPass123",
         }
 
         register_response = client.post("/api/v1/auth/register", json=register_data)
         assert register_response.status_code == 200
 
-        login_data = {
-            "email": "test@example.com",
-            "password": "StrongPass123"
-        }
+        login_data = {"email": "test@example.com", "password": "StrongPass123"}
 
         login_response = client.post("/api/v1/auth/login", json=login_data)
         assert login_response.status_code == 200
@@ -270,28 +269,28 @@ class TestAuthIntegration:
 @pytest.mark.asyncio
 class TestAsyncAuth:
 
-    @patch('app.services.user_service.UserRepository.get_user_by_email')
+    @patch("app.services.user_service.UserRepository.get_user_by_email")
     async def test_authenticate_user_success(self, mock_get_user, mock_user):
         from app.services.user_service import UserService
         from app.core.security import AuthService
 
         mock_get_user.return_value = mock_user
 
-        with patch.object(AuthService, 'verify_password', return_value=True):
+        with patch.object(AuthService, "verify_password", return_value=True):
             session = AsyncMock()
             result = await UserService.authenticate_user(
                 session, "test@example.com", "correct_password"
             )
             assert result == mock_user
 
-    @patch('app.services.user_service.UserRepository.get_user_by_email')
+    @patch("app.services.user_service.UserRepository.get_user_by_email")
     async def test_authenticate_user_wrong_password(self, mock_get_user, mock_user):
         from app.services.user_service import UserService
         from app.core.security import AuthService
 
         mock_get_user.return_value = mock_user
 
-        with patch.object(AuthService, 'verify_password', return_value=False):
+        with patch.object(AuthService, "verify_password", return_value=False):
             session = AsyncMock()
             result = await UserService.authenticate_user(
                 session, "test@example.com", "wrong_password"

@@ -41,7 +41,8 @@ async def get_current_user(
 async def get_refresh_token(refresh_token: str | None = Cookie(default=None)):
     if refresh_token is None:
         logger.warning("No refresh_token in cookie")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token provided")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token provided"
+        )
     logger.debug(f"Extracted refresh_token from cookie: {refresh_token}")
     return refresh_token
-

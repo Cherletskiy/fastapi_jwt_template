@@ -15,11 +15,11 @@ logger = setup_logger(__name__)
 class AuthService:
     @staticmethod
     def get_password_hash(password: str) -> str:
-        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     @staticmethod
     def verify_password(password: str, hashed_password: str) -> bool:
-        return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+        return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
 
     @staticmethod
     def create_token(data: dict, token_type: str, expires_delta: timedelta) -> str:
@@ -30,21 +30,29 @@ class AuthService:
 
     @staticmethod
     def create_access_token(data: dict) -> str:
-        return AuthService.create_token(data, "access", timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+        return AuthService.create_token(
+            data, "access", timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
 
     @staticmethod
     def create_refresh_token(data: dict) -> str:
-        return AuthService.create_token(data, "refresh", timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
+        return AuthService.create_token(
+            data, "refresh", timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        )
 
     @staticmethod
     def decode_token(token: str | bytes, expected_type: str = "access") -> dict:
         try:
             if isinstance(token, str):
-                token = token.encode('utf-8')
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                token = token.encode("utf-8")
+            payload = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            )
             token_type = payload.get("type")
             if token_type != expected_type:
-                logger.warning(f"Invalid token type: {token_type}, expected: {expected_type}")
+                logger.warning(
+                    f"Invalid token type: {token_type}, expected: {expected_type}"
+                )
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail=f"Invalid {expected_type} token",
@@ -61,9 +69,7 @@ class AuthService:
 
     @staticmethod
     async def get_current_user(
-            token: str,
-            session: AsyncSession,
-            expected_type: str = "access"
+        token: str, session: AsyncSession, expected_type: str = "access"
     ) -> User:
         payload = AuthService.decode_token(token, expected_type)
         user_id = payload.get("sub")

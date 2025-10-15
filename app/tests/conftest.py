@@ -23,4 +23,4 @@ def mock_async_session():
 
 
 # Глобальная конфигурация pytest
-pytest_plugins = ['pytest_asyncio']
+pytest_plugins = ["pytest_asyncio"]

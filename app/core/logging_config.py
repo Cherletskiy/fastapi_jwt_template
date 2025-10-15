@@ -24,8 +24,3 @@ def setup_logger(name: str) -> logging.Logger:
         logger.addHandler(file_handler)
 
     return logger
-
-
-# from app.core.logging_config import setup_logger
-#
-# logger = setup_logger(__name__)

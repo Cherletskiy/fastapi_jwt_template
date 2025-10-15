@@ -6,6 +6,7 @@ import anyio
 
 async def run_migrations():
     """Применяет все миграции до head."""
+
     def _run():
         # Базовая директория
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

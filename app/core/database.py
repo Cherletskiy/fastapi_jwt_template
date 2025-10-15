@@ -7,18 +7,10 @@ from app.core.config import settings
 logger = setup_logger(__name__)
 
 
-engine = create_async_engine(
-    url=settings.DSN,
-    echo=False,
-    pool_size=5,
-    max_overflow=10
-)
+engine = create_async_engine(url=settings.DSN, echo=False, pool_size=5, max_overflow=10)
 
 async_session_factory = async_sessionmaker(
-    bind=engine,
-    expire_on_commit=False,
-    autoflush=False,
-    class_=AsyncSession
+    bind=engine, expire_on_commit=False, autoflush=False, class_=AsyncSession
 )
 
 
