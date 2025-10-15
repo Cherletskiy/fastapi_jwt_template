@@ -47,36 +47,36 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      test_db:
-        condition: service_healthy
+#      test_db:
+#        condition: service_healthy
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
-#  app:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    container_name: fastapi_app
-#    restart: always
-#    environment:
-#      - DB_HOST=${DB_HOST}
-#      - DB_PORT=${DB_PORT}
-#      - DB_NAME=${DB_NAME}
-#      - DB_USER=${DB_USER}
-#      - DB_PWD=${DB_PWD}
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    restart: always
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PWD=${DB_PWD}
 #      - TEST_DB_HOST=${TEST_DB_HOST}
 #      - TEST_DB_PORT=${TEST_DB_PORT}
 #      - TEST_DB_NAME=${TEST_DB_NAME}
 #      - TEST_DB_USER=${TEST_DB_USER}
 #      - TEST_DB_PWD=${TEST_DB_PWD}
-#    ports:
-#      - 8000:8000
-#    depends_on:
-#      db:
-#        condition: service_healthy
+    ports:
+      - 8000:8000
+    depends_on:
+      db:
+        condition: service_healthy
 
 
 volumes:
   pg_data:
-  test_pg_data:
+#  test_pg_data:
   pgadmin_data:

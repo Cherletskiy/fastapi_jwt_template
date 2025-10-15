@@ -6,10 +6,10 @@ load_dotenv()
 
 
 class Settings:
-    # DB_HOST: str = os.getenv("DB_HOST", "db")
-    # DB_PORT: str = os.getenv("DB_PORT", "5432")
-    DB_HOST: str = "localhost"
-    DB_PORT: str = "5431"
+    DB_HOST: str = os.getenv("DB_HOST", "db")
+    DB_PORT: str = os.getenv("DB_PORT", "5432")
+    # DB_HOST: str = "localhost"
+    # DB_PORT: str = "5431"
     DB_NAME: str = os.getenv("DB_NAME", "postgres")
     DB_USER: str = os.getenv("DB_USER", "postgres")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "postgres")
