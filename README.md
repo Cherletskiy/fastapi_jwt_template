@@ -29,6 +29,7 @@ fastapi_jwt_template/
 │   │   ├── config.py            # Настройки приложения
 │   │   ├── database.py          # Настройка БД
 │   │   ├── dependencies.py      # Зависимости FastAPI
+│   │   ├── exceptions.py        # Обработка исключений
 │   │   ├── logging_config.py    # Настройка логирования
 │   │   ├── migrations.py        # Миграции БД
 │   │   └── security.py          # Аутентификация
@@ -41,7 +42,7 @@ fastapi_jwt_template/
 │   ├── tests/
 │   │   ├── conftest.py          # Конфигурация pytest
 │   │   └── test_auth.py         # Тесты
-│   └── main.py                  # Точка входа приложения
+│   └── main.py                  # Точка входа приложения, middleware (exception handler)
 ├── alembic/
 │   ├── versions/                # Файлы миграций
 │   └── env.py                   # Настройка Alembic
@@ -140,7 +141,7 @@ fastapi_jwt_template/
   ```
 - **Ошибка** (400):
   ```json
-  {"detail":"Email already registered"}
+  {"detail":"Email {email} already registered"}
   ```
 
 ### 2. Вход (`/login`)
@@ -175,28 +176,10 @@ fastapi_jwt_template/
   - Новый `refresh_token` в куки.
 - **Ошибка** (401):
   ```json
-  {"detail":"No refresh token provided"}
-  ```
-
-### 4. Обновление токена через тело (`/refresh-body`)
-- **Запрос**:
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/auth/refresh-body \
-    -H "Content-Type: application/json" \
-    -d '{"token":"eyJ..."}' \
-    -c cookies.txt
-  ```
-- **Ответ** (200):
-  ```json
-  {"access_token":"eyJ...","token_type":"bearer"}
-  ```
-  - Новый `refresh_token` в куки.
-- **Ошибка** (401):
-  ```json
   {"detail":"Invalid token"}
   ```
 
-### 5. Получение профиля (`/me`)
+### 4. Получение профиля (`/me`)
 - **Запрос**:
   ```bash
   curl -X GET http://localhost:8000/api/v1/auth/me \
@@ -234,7 +217,7 @@ fastapi_jwt_template/
 3. Для `/refresh-body` используйте `refresh_token` из DevTools (Application → Cookies).
 
 ## Покрытие тестами
-Интеграционные тесты покрывают 81% кода. Отчёт:
+Тесты покрывают 81% кода. Отчёт:
 
 | Файл                            | Строк | Пропущено | Покрытие |
 |--------------------------------|-------|-----------|----------|
@@ -258,7 +241,7 @@ fastapi_jwt_template/
 | app/services/__init__.py       | 0     | 0         | 100%     |
 | app/services/user_service.py   | 34    | 12        | 65%      |
 | **Итого**                      | **310** | **58**  | **81%**  |
-
+P.S. Тесты в разработке, поэтому в последнем коммите могут быть другие данные.
 
 ## Планы доработки
 - Добавить rate-limiting для `/login` (защита от brute-force).
