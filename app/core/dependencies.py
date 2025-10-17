@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
 from app.core.security import AuthService
+from app.core.exceptions import DatabaseException, AppException
 from app.core.logging_config import setup_logger
-from app.services.user_service import UserService
+
 
 logger = setup_logger(__name__)
 
@@ -13,18 +14,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 async def get_async_session() -> AsyncSession:
-    """Зависимость для получения асинхронной сессии в эндпоинтах.
-    Пропускает HTTPException в случае ошибки, так как эти ошибки обрабатываются внутри сервиса.
-    Остальные ошибки логируются, вызывается rollback и 500 клиенту.
-    """
     async with async_session_factory() as session:
         try:
             yield session
-        except HTTPException as e:
-            raise e
+        except AppException as e:
+            if isinstance(e, DatabaseException):
+                await session.rollback()
+                logger.error(f"Database error in session: {e.internal_detail}")
+            raise
         except Exception as e:
             await session.rollback()
-            logger.error(f"Error in async session: {e}")
+            logger.error(f"Unexpected error in async session: {e}")
             raise
         finally:
             await session.close()

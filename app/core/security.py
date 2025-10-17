@@ -1,13 +1,13 @@
 import jwt
 import bcrypt
 from datetime import datetime, timedelta
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.logging_config import setup_logger
+from app.core.exceptions import InvalidTokenException
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.core.logging_config import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -53,19 +53,11 @@ class AuthService:
                 logger.warning(
                     f"Invalid token type: {token_type}, expected: {expected_type}"
                 )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Invalid {expected_type} token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise InvalidTokenException()
             return payload
         except jwt.PyJWTError as e:
             logger.warning(f"Token validation error: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise InvalidTokenException()
 
     @staticmethod
     async def get_current_user(
@@ -75,18 +67,11 @@ class AuthService:
         user_id = payload.get("sub")
         if user_id is None:
             logger.warning("Missing 'sub' in token")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise InvalidTokenException()
+
         user_id = int(user_id)
         user = await UserRepository.get_user_by_id(session, user_id)
         if not user:
             logger.warning(f"User with id {user_id} not found")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise InvalidTokenException()
         return user
