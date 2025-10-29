@@ -52,3 +52,21 @@ class AuthorizationRepository:
     async def get_permission_by_name(session: AsyncSession, name: str) -> Permission | None:
         result = await session.execute(select(Permission).filter_by(name=name))
         return result.scalars().first()
+
+    @staticmethod
+    async def get_user_role_link(session: AsyncSession, user_id: int, role_id: int) -> UserRole | None:
+        """Проверяет есть ли связь пользователь-роль"""
+        stmt = select(UserRole).where(
+            UserRole.user_id == user_id,
+            UserRole.role_id == role_id
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create_user_role(session: AsyncSession, user_id: int, role_id: int) -> UserRole:
+        """Создает связь пользователь-роль"""
+        user_role = UserRole(user_id=user_id, role_id=role_id)
+        session.add(user_role)
+
+        return user_role
