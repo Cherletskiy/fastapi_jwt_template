@@ -91,3 +91,13 @@ async def logout(response: Response, current_user: User = Depends(get_current_us
 
     logger.info(f"User logged out: {current_user.email}")
     return {"message": "Logged out"}
+
+
+@router.post("/deactivate")
+async def deactivate_user(current_user: User = Depends(get_current_user),
+                          session: AsyncSession = Depends(get_async_session)):
+    await UserService.deactivate_user(session, current_user)
+
+    logger.info(f"User deactivated: {current_user.email}")
+    return {"message": f"User {current_user.email} deactivated"}
+

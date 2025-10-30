@@ -62,3 +62,9 @@ class UserService:
         except Exception as e:
             await session.rollback()
             raise
+
+    @staticmethod
+    async def deactivate_user(session: AsyncSession, user: User) -> None:
+        user.is_active = False
+        await session.commit()
+        logger.info(f"User deactivated: {user.email}")
