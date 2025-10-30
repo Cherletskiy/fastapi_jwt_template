@@ -23,7 +23,13 @@ class UserService:
 
     @staticmethod
     async def create_user(
-            session: AsyncSession, username: str, email: str, hashed_password: str
+            session: AsyncSession,
+            username: str,
+            email: str,
+            first_name: str,
+            last_name: str,
+            middle_name: str,
+            hashed_password: str
     ) -> User:
         # Проверяем существующего пользователя
         existing_user = await UserRepository.get_user_by_email(session, email)
@@ -33,7 +39,14 @@ class UserService:
 
         try:
             # Создаем пользователя
-            user = await UserRepository.create_user(session, username, email, hashed_password)
+            user = await UserRepository.create_user(
+                session,
+                username,
+                email,
+                first_name,
+                last_name,
+                middle_name,
+                hashed_password)
 
             # Назначаем роль
             success = await AuthorizationService.assign_role_to_user(session, user.id, "user")

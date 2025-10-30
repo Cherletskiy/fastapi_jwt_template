@@ -5,7 +5,11 @@ from datetime import datetime
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
+    last_name: str = Field(..., min_length=2, max_length=100)
+    first_name: str = Field(..., min_length=2, max_length=100)
+    middle_name: str = Field(..., min_length=2, max_length=100)
     password: str = Field(..., min_length=6)
+    confirm_password: str = Field(..., min_length=6)
 
     @field_validator("password")
     def password_strength(cls, v):
@@ -17,6 +21,12 @@ class UserCreate(BaseModel):
             raise ValueError(
                 "Password must be at least 8 characters with uppercase and digit"
             )
+        return v
+
+    @field_validator("confirm_password")
+    def password_match(cls, v, info):
+        if "password" in info.data and v != info.data["password"]:
+            raise ValueError("Passwords do not match")
         return v
 
     model_config = ConfigDict(extra="forbid")
@@ -33,6 +43,9 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: EmailStr
+    last_name: str
+    first_name: str
+    middle_name: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")

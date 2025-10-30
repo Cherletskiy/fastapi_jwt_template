@@ -30,7 +30,13 @@ async def register(
 ):
     hashed_password = AuthService.get_password_hash(user_data.password)
     user = await UserService.create_user(
-        session, user_data.username, user_data.email, hashed_password
+        session,
+        user_data.username,
+        user_data.email,
+        user_data.first_name,
+        user_data.last_name,
+        user_data.middle_name,
+        hashed_password
     )
     logger.info(f"User registered: {user.email}")
     return user
