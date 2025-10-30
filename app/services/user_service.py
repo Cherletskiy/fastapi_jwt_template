@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.schemas import UserUpdate
 from app.core.security import AuthService
 from app.repositories.user_repository import UserRepository
 from app.models.user import User
@@ -62,6 +63,32 @@ class UserService:
         except Exception as e:
             await session.rollback()
             raise
+
+    @staticmethod
+    async def update_user(session: AsyncSession, user: User, user_data: UserUpdate):
+        update_data = user_data.model_dump(exclude_unset=True)
+
+        for key, value in update_data.items():
+            old_value = getattr(user, key)
+
+            if old_value == value:
+                continue
+
+            if key == "email":
+                # Проверяем уникальность email
+                existing_user = await UserRepository.get_user_by_email(session, value)
+                if existing_user:
+                    logger.warning(f"User {user.id} attempted to change email to existing: {value}")
+                    raise UserAlreadyExistsException(detail=f"Email {value} already registered")
+
+            # Применяем изменение
+            setattr(user, key, value)
+            logger.info(f"User {user.id} updated {key}: {old_value} → {value}")
+
+        await session.commit()
+        await session.refresh(user)
+        return user
+
 
     @staticmethod
     async def deactivate_user(session: AsyncSession, user: User) -> None:

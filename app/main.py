@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.core.database import init_db, close_db
 from app.core.migrations import run_migrations
 from app.api.v1.auth import router as auth_router
+from app.api.v1.users import router as users_router
 from app.core.exceptions import AppException, DatabaseException
 from app.core.logging_config import setup_logger
 
@@ -33,6 +34,7 @@ app = FastAPI(
 
 
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 
 
 @app.exception_handler(AppException)

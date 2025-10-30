@@ -1,13 +1,16 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 from datetime import datetime
 
 
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     last_name: str = Field(..., min_length=2, max_length=100)
     first_name: str = Field(..., min_length=2, max_length=100)
     middle_name: str = Field(..., min_length=2, max_length=100)
+
+
+class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
     confirm_password: str = Field(..., min_length=6)
 
@@ -30,6 +33,20 @@ class UserCreate(BaseModel):
         return v
 
     model_config = ConfigDict(extra="forbid")
+
+
+class UserUpdate(UserBase):
+    username: str | None = None
+    email: EmailStr | None = None
+    last_name: str | None = None
+    first_name: str | None = None
+    middle_name: str | None = None
+
+    @model_validator(mode='after')
+    def check_not_empty(self):
+        if not self.model_fields_set:
+            raise ValueError('At least one field must be provided for update')
+        return self
 
 
 class UserLogin(BaseModel):
