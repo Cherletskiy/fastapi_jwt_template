@@ -11,8 +11,8 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=6)
-    confirm_password: str = Field(..., min_length=6)
+    password: str = Field(...)
+    confirm_password: str = Field(...)
 
     @field_validator("password")
     def password_strength(cls, v):
