@@ -1,8 +1,11 @@
+from unittest.mock import patch, AsyncMock
+
 import pytest
 
 from app.core.security import AuthService
 
 
+@pytest.mark.asyncio
 class TestSecurityUtils:
 
     def test_password_hashing(self):
@@ -49,3 +52,56 @@ class TestSecurityUtils:
         invalid_token = "invalid.token.here"
         with pytest.raises(Exception):
             AuthService.decode_token(invalid_token, "access")
+
+    @patch("app.core.redis.redis_manager.is_available")
+    @patch("app.core.redis.redis_manager.get_client")
+    async def test_add_to_blacklist_success(self, mock_get_client, mock_is_available):
+        """Тест успешного добавления токена в blacklist"""
+        mock_is_available.return_value = True
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+        mock_client.setex.return_value = True
+
+        # Мокаем decode_token чтобы вернуть payload с expiration
+        with patch.object(AuthService, 'decode_token') as mock_decode:
+            mock_decode.return_value = {"exp": 9999999999, "type": "access"}
+
+            result = await AuthService.add_to_blacklist("test_token", "access")
+
+            assert result is True
+            mock_client.setex.assert_called_once()
+
+    @patch("app.core.redis.redis_manager.is_available")
+    async def test_add_to_blacklist_redis_unavailable(self, mock_is_available):
+        """Тест когда Redis недоступен"""
+        mock_is_available.return_value = False
+
+        result = await AuthService.add_to_blacklist("test_token", "access")
+
+        assert result is False
+
+    @patch("app.core.redis.redis_manager.is_available")
+    @patch("app.core.redis.redis_manager.get_client")
+    async def test_is_token_revoked_true(self, mock_get_client, mock_is_available):
+        """Тест когда токен в blacklist"""
+        mock_is_available.return_value = True
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+        mock_client.exists.return_value = 1  # Redis возвращает 1 если ключ существует
+
+        result = await AuthService.is_token_revoked("test_token", "access")
+
+        assert result is True
+
+    @patch("app.core.redis.redis_manager.is_available")
+    @patch("app.core.redis.redis_manager.get_client")
+    async def test_is_token_revoked_false(self, mock_get_client, mock_is_available):
+        """Тест когда токен НЕ в blacklist"""
+        mock_is_available.return_value = True
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+        mock_client.exists.return_value = 0  # Redis возвращает 0 если ключа нет
+
+        result = await AuthService.is_token_revoked("test_token", "access")
+
+        assert result is False
