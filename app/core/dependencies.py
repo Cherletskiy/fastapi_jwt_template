@@ -49,45 +49,47 @@ async def get_refresh_token(refresh_token: str | None = Cookie(default=None)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="No refresh token provided"
         )
-    logger.debug(f"Extracted refresh_token from cookie: {refresh_token}")
     return refresh_token
 
 
-async def require_permissions(
-    permissions: list[str],
-    all_required: bool = False,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
-) -> User:
-    user_perms = await AuthorizationService.has_permission_list(session, current_user.id)
+def require_roles_factory(roles: list[str], all_required: bool = False):
+    """
+    Фабрика зависимостей для проверки ролей пользователя.
+    """
+    async def require_roles(
+            current_user: User = Depends(get_current_user),
+            session: AsyncSession = Depends(get_async_session),
+    ) -> User:
+        user_roles = await AuthorizationService.get_user_role_names(session, current_user.id)
 
-    if all_required:
-        if not all(perm in user_perms for perm in permissions):
-            raise InsufficientPermissionsException()
-    else:
-        if not any(perm in user_perms for perm in permissions):
-            raise InsufficientPermissionsException()
+        if all_required:
+            if not all(role in user_roles for role in roles):
+                raise InsufficientPermissionsException()
+        else:
+            if not any(role in user_roles for role in roles):
+                raise InsufficientPermissionsException()
 
-    requirement_type = "all" if all_required else "any of"
-    logger.debug(f"User {current_user.id} has {requirement_type} required permissions: {permissions}")
-    return current_user
+        requirement_type = "all" if all_required else "any of"
+        logger.info(f"User {current_user.id} has {requirement_type} required roles: {roles}")
+        return current_user
+    return require_roles
 
 
-async def require_roles(
-    roles: list[str],
-    all_required: bool = False,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session),
-) -> User:
-    user_roles = await AuthorizationService.get_user_role_names(session, current_user.id)
-
-    if all_required:
-        if not all(role in user_roles for role in roles):
-            raise InsufficientPermissionsException()
-    else:
-        if not any(role in user_roles for role in roles):
-            raise InsufficientPermissionsException()
-
-    requirement_type = "all" if all_required else "any of"
-    logger.debug(f"User {current_user.id} has {requirement_type} required roles: {roles}")
-    return current_user
+# def require_permissions_factory(permissions: list[str], all_required: bool = False):
+#     async def require_permissions(
+#         current_user: User = Depends(get_current_user),
+#         session: AsyncSession = Depends(get_async_session),
+#     ) -> User:
+#         user_perms = await AuthorizationService.has_permission_list(session, current_user.id)
+#
+#         if all_required:
+#             if not all(perm in user_perms for perm in permissions):
+#                 raise InsufficientPermissionsException()
+#         else:
+#             if not any(perm in user_perms for perm in permissions):
+#                 raise InsufficientPermissionsException()
+#
+#         requirement_type = "all" if all_required else "any of"
+#         logger.debug(f"User {current_user.id} has {requirement_type} required permissions: {permissions}")
+#         return current_user
+#     return require_permissions
