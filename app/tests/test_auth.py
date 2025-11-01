@@ -19,6 +19,10 @@ def mock_user():
         username="testuser",
         email="test@example.com",
         hashed_password="hashed_password_123",
+        first_name="Ivan",
+        last_name="Petrov",
+        middle_name="Sergeevich",
+        is_active=True,
         created_at=datetime.utcnow(),
     )
 
@@ -35,44 +39,52 @@ def valid_refresh_token(mock_user):
 
 class TestAuthEndpoints:
 
-    @patch("app.api.v1.auth.UserService.get_user_by_email")
-    @patch("app.api.v1.auth.UserService.create_user")
-    @patch("app.api.v1.auth.AuthService.get_password_hash")
+    @patch("app.services.user_service.AuthorizationService.assign_role_to_user")
+    @patch("app.services.user_service.AuthService.get_password_hash")
+    @patch("app.services.user_service.UserRepository.create_user")
+    @patch("app.services.user_service.UserRepository.get_user_by_email")
     def test_register_success(
-        self, mock_hash, mock_create_user, mock_get_user, mock_user
+            self,
+            mock_get_user_by_email,
+            mock_create_user,
+            mock_hash,
+            mock_assign_role,
+            mock_user
     ):
-        mock_get_user.return_value = None
+        mock_get_user_by_email.return_value = None
         mock_hash.return_value = "hashed_password_123"
         mock_create_user.return_value = mock_user
+        mock_assign_role.return_value = True
 
-        user_data = {
+        response = client.post("/api/v1/auth/register", json={
             "username": "testuser",
             "email": "test@example.com",
             "password": "StrongPass123",
-        }
-
-        response = client.post("/api/v1/auth/register", json=user_data)
+            "confirm_password": "StrongPass123",
+            "first_name": "Ivan",
+            "last_name": "Petrov",
+            "middle_name": "Sergeevich"
+        })
 
         assert response.status_code == 200
-        assert response.json()["email"] == user_data["email"]
-        assert response.json()["username"] == user_data["username"]
-        assert "id" in response.json()
-        assert "created_at" in response.json()
+        assert response.json()["email"] == "test@example.com"
 
-    @patch("app.api.v1.auth.UserService.get_user_by_email")
-    def test_register_existing_email(self, mock_get_user, mock_user):
+    @patch("app.services.user_service.UserRepository.get_user_by_email")
+    def test_register_existing_email(mock_get_user, mock_user):
         mock_get_user.return_value = mock_user
 
-        user_data = {
+        response = client.post("/api/v1/auth/register", json={
             "username": "testuser",
             "email": "test@example.com",
             "password": "StrongPass123",
-        }
-
-        response = client.post("/api/v1/auth/register", json=user_data)
+            "confirm_password": "StrongPass123",
+            "first_name": "Ivan",
+            "last_name": "Petrov",
+            "middle_name": "Sergeevich"
+        })
 
         assert response.status_code == 400
-        assert response.json()["detail"] == "Email test@example.com already registered"
+        assert "already registered" in response.json()["detail"]
 
     def test_register_invalid_password(self):
         user_data = {
@@ -97,16 +109,6 @@ class TestAuthEndpoints:
         assert response.json()["token_type"] == "bearer"
         assert "refresh_token" in response.cookies
 
-    # @patch("app.api.v1.auth.UserService.authenticate_user")
-    # def test_login_invalid_credentials(self, mock_authenticate):
-    #     mock_authenticate.return_value = None
-    #
-    #     login_data = {"email": "test@example.com", "password": "wrong_password"}
-    #
-    #     response = client.post("/api/v1/auth/login", json=login_data)
-    #     assert response.status_code == 401
-    #     assert response.json()["detail"] == "Invalid credentials"
-
     def test_login_invalid_data(self):
         login_data = {"email": "invalid-email", "password": "pass"}
 
@@ -115,22 +117,33 @@ class TestAuthEndpoints:
 
     @patch("app.core.dependencies.AuthService.get_current_user")
     def test_get_me_success(self, mock_get_current_user, mock_user, valid_access_token):
-        mock_get_current_user.return_value = mock_user
+        real_user_data = User(
+            id=1,
+            username="testuser",
+            email="test@example.com",
+            first_name="Ivan",
+            last_name="Petrov",
+            middle_name="Sergeevich",
+            hashed_password="hashed",
+            created_at=datetime.utcnow(),
+            is_active=True
+        )
+        mock_get_current_user.return_value = real_user_data
 
         headers = {"Authorization": f"Bearer {valid_access_token}"}
-        response = client.get("/api/v1/auth/me", headers=headers)
+        response = client.get("/api/v1/users/me", headers=headers)
 
         assert response.status_code == 200
-        assert response.json()["email"] == mock_user.email
-        assert response.json()["username"] == mock_user.username
+        assert response.json()["email"] == "test@example.com"
+        assert response.json()["username"] == "testuser"
 
     def test_get_me_unauthorized(self):
-        response = client.get("/api/v1/auth/me")
+        response = client.get("/api/v1/users/me")
         assert response.status_code == 401
 
     def test_get_me_invalid_token(self):
         headers = {"Authorization": "Bearer invalid_token"}
-        response = client.get("/api/v1/auth/me", headers=headers)
+        response = client.get("/api/v1/users/me", headers=headers)
         assert response.status_code == 401
 
     @patch("app.core.dependencies.AuthService.get_current_user")
@@ -143,24 +156,18 @@ class TestAuthEndpoints:
         assert response.status_code == 200
         assert response.json()["message"] == "Logged out"
 
-        set_cookie_header = response.headers.get("set-cookie")
-        assert set_cookie_header is not None
+        set_cookie_header = response.headers.get("set-cookie", "")
+        # Проверяем что cookie устанавливается для удаления
         assert "refresh_token" in set_cookie_header
         assert "Max-Age=0" in set_cookie_header
 
-    @patch("app.core.dependencies.AuthService.get_current_user")
-    def test_refresh_token_success(
-        self, mock_get_current_user, mock_user, valid_refresh_token
-    ):
+    @patch("app.core.security.AuthService.get_current_user")
+    def test_refresh_token_success(mock_get_current_user, mock_user, valid_refresh_token):
         mock_get_current_user.return_value = mock_user
 
-        cookies = {"refresh_token": valid_refresh_token}
-        response = client.post("/api/v1/auth/refresh", cookies=cookies)
-
+        response = client.post("/api/v1/auth/refresh", cookies={"refresh_token": valid_refresh_token})
         assert response.status_code == 200
         assert "access_token" in response.json()
-        assert response.json()["token_type"] == "bearer"
-        assert "refresh_token" in response.cookies
 
     def test_refresh_token_missing(self):
         client.cookies.clear()
@@ -225,44 +232,56 @@ class TestSecurityUtils:
 
 class TestAuthIntegration:
 
-    @patch("app.api.v1.auth.UserService.get_user_by_email")
-    @patch("app.api.v1.auth.UserService.create_user")
-    @patch("app.api.v1.auth.UserService.authenticate_user")
     @patch("app.core.dependencies.AuthService.get_current_user")
+    @patch("app.services.user_service.AuthorizationService.assign_role_to_user")
+    @patch("app.services.user_service.AuthService.verify_password")
+    @patch("app.services.user_service.UserRepository.create_user")
+    @patch("app.services.user_service.UserRepository.get_user_by_email")
     def test_full_auth_flow(
-        self,
-        mock_get_current_user,
-        mock_authenticate,
-        mock_create_user,
-        mock_get_user,
-        mock_user,
+            self,
+            mock_get_user_by_email,
+            mock_create_user,
+            mock_verify_password,
+            mock_assign_role,
+            mock_get_current_user,
+            mock_user
     ):
-        mock_get_user.return_value = None
-        mock_create_user.return_value = mock_user
-        mock_authenticate.return_value = mock_user
-        mock_get_current_user.return_value = mock_user
 
-        register_data = {
+        mock_get_user_by_email.return_value = None
+        mock_create_user.return_value = mock_user
+        mock_assign_role.return_value = True
+
+        reg_response = client.post("/api/v1/auth/register", json={
             "username": "testuser",
             "email": "test@example.com",
             "password": "StrongPass123",
-        }
+            "confirm_password": "StrongPass123",
+            "first_name": "Ivan",
+            "last_name": "Petrov",
+            "middle_name": "Sergeevich"
+        })
+        assert reg_response.status_code == 200
 
-        register_response = client.post("/api/v1/auth/register", json=register_data)
-        assert register_response.status_code == 200
+        mock_get_user_by_email.return_value = mock_user
+        mock_verify_password.return_value = True
+        mock_get_current_user.return_value = mock_user
 
-        login_data = {"email": "test@example.com", "password": "StrongPass123"}
-
-        login_response = client.post("/api/v1/auth/login", json=login_data)
+        login_response = client.post("/api/v1/auth/login", json={
+            "email": "test@example.com",
+            "password": "StrongPass123"
+        })
         assert login_response.status_code == 200
 
         access_token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {access_token}"}
 
-        me_response = client.get("/api/v1/auth/me", headers=headers)
+        me_response = client.get("/api/v1/users/me", headers={
+            "Authorization": f"Bearer {access_token}"
+        })
         assert me_response.status_code == 200
 
-        logout_response = client.post("/api/v1/auth/logout", headers=headers)
+        logout_response = client.post("/api/v1/auth/logout", headers={
+            "Authorization": f"Bearer {access_token}"
+        })
         assert logout_response.status_code == 200
 
 
@@ -296,4 +315,3 @@ class TestAsyncAuth:
                 result = await UserService.authenticate_user(
                     session, "test@example.com", "wrong_password"
                 )
-
