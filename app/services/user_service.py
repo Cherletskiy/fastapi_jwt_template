@@ -4,7 +4,7 @@ from app.api.v1.schemas import UserUpdate
 from app.core.security import AuthService
 from app.repositories.user_repository import UserRepository
 from app.models.user import User
-from app.core.exceptions import UserAlreadyExistsException, InvalidCredentialsException
+from app.core.exceptions import UserAlreadyExistsException, InvalidCredentialsException, DatabaseException
 from app.core.logging_config import setup_logger
 from app.services.authorization_service import AuthorizationService
 
@@ -53,6 +53,7 @@ class UserService:
             success = await AuthorizationService.assign_role_to_user(session, user.id, "user")
             if not success:
                 logger.error(f"Failed to assign 'user' role to {email}")
+                raise DatabaseException(internal_detail=f"Registration failed: failed to assign 'user' role to {email}")
 
             # Коммитим всю транзакцию
             await session.commit()
