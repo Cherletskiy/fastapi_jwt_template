@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi.testclient import TestClient
 import pytest
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import AuthService
@@ -32,17 +32,17 @@ def mock_async_session():
 
 @pytest.fixture
 def mock_user():
-    return User(
-        id=1,
-        username="testuser",
-        email="test@example.com",
-        hashed_password="hashed_password_123",
-        first_name="Ivan",
-        last_name="Petrov",
-        middle_name="Sergeevich",
-        is_active=True,
-        created_at=datetime.utcnow(),
-    )
+    user = MagicMock()
+    user.id = 1
+    user.username = "testuser"
+    user.email = "test@example.com"
+    user.hashed_password = "hashed_password_123"
+    user.first_name = "Ivan"
+    user.last_name = "Petrov"
+    user.middle_name = "Sergeevich"
+    user.is_active = True
+    user.created_at = datetime.utcnow()
+    return user
 
 
 @pytest.fixture
