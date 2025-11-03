@@ -62,28 +62,33 @@ services:
     volumes:
       - redis_data:/data
 
-#  app:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    container_name: fastapi_app
-#    restart: always
-#    environment:
-#      - DB_HOST=${DB_HOST}
-#      - DB_PORT=${DB_PORT}
-#      - DB_NAME=${DB_NAME}
-#      - DB_USER=${DB_USER}
-#      - DB_PWD=${DB_PWD}
-##      - TEST_DB_HOST=${TEST_DB_HOST}
-##      - TEST_DB_PORT=${TEST_DB_PORT}
-##      - TEST_DB_NAME=${TEST_DB_NAME}
-##      - TEST_DB_USER=${TEST_DB_USER}
-##      - TEST_DB_PWD=${TEST_DB_PWD}
-#    ports:
-#      - 8000:8000
-#    depends_on:
-#      db:
-#        condition: service_healthy
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    restart: always
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PWD=${DB_PWD}
+      - TEST_DB_HOST=${TEST_DB_HOST}
+      - TEST_DB_PORT=${TEST_DB_PORT}
+      - TEST_DB_NAME=${TEST_DB_NAME}
+      - TEST_DB_USER=${TEST_DB_USER}
+      - TEST_DB_PWD=${TEST_DB_PWD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
+      - LOCAL_APP=${LOCAL_APP}
+    ports:
+      - 8000:8000
+    depends_on:
+      db:
+        condition: service_healthy
 
 
 volumes:

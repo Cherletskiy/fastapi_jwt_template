@@ -9,12 +9,9 @@ from app.models import user, rbac # без импорта не работала 
 config = context.config
 
 # Заменяем asyncpg на sync драйвер для миграций
-# sync_dsn = settings.DSN.replace("postgresql+asyncpg", "postgresql")
-# config.set_main_option("sqlalchemy.url", sync_dsn)
-
-# # для локального тестирования
-sync_dsn = f"postgresql://{settings.DB_USER}:{settings.DB_PASSWORD}@localhost:5431/{settings.DB_NAME}"
+sync_dsn = settings.DSN.replace("postgresql+asyncpg", "postgresql")
 config.set_main_option("sqlalchemy.url", sync_dsn)
+
 
 # Метаданные для автогенерации миграций
 target_metadata = Base.metadata

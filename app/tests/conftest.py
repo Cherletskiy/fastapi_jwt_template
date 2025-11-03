@@ -6,13 +6,15 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
-import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.core.security import AuthService
 from app.main import app
 from app.models.base import Base
+from app.core.config import settings
 
+
+TEST_DSN = settings.TEST_DSN
 
 # Создаем клиент внутри фикстуры, а не глобально
 @pytest.fixture(scope="session")
@@ -64,15 +66,6 @@ def valid_access_token(mock_user):
 def valid_refresh_token(mock_user):
     return AuthService.create_refresh_token({"sub": str(mock_user.id)})
 
-
-TEST_DB_NAME = os.getenv("TEST_DB_NAME", "testdb")
-TEST_DB_USER = os.getenv("TEST_DB_USER", "testuser")
-TEST_DB_PWD = os.getenv("TEST_DB_PWD", "testpass")
-TEST_DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
-TEST_DB_PORT = os.getenv("TEST_DB_PORT", "5433")
-
-# TEST_DSN = f"postgresql+asyncpg://{TEST_DB_USER}:{TEST_DB_PWD}@{TEST_DB_HOST}:{TEST_DB_PORT}/{TEST_DB_NAME}"
-TEST_DSN = f"postgresql+asyncpg://{TEST_DB_USER}:{TEST_DB_PWD}@localhost:5433/{TEST_DB_NAME}"
 
 @pytest_asyncio.fixture(scope="function")
 async def test_db():

@@ -19,8 +19,8 @@ REST API на FastAPI для реализации аутентификации �
   - Хеширование паролей с использованием bcrypt
   - Blacklist отозванных токенов через Redis
   - Валидация данных через Pydantic
-- **Администрирование**: Панели модератора и администратора с разграничением прав доступа
-- **Тестирование**: Интеграционные тесты с покрытием кода 88%
+- **Администрирование**: Панели модератора и администратора с разграничением прав доступа (пока без функционала)
+- **Тестирование**: Интеграционные тесты и юнит-тесты с покрытием кода 87%
 - **Логирование**: Детальное логирование запросов и ошибок
 - **Документация**: Swagger UI для интерактивной документации API
 
@@ -85,7 +85,7 @@ fastapi_jwt_template/
 
 ### Пользователь (`users` таблица)
 - **id**: `int`, первичный ключ, автоинкремент
-- **username**: `str`, уникальное имя пользователя
+- **username**: `str`, nickname (пока заглушка, можно удалить или доработать)
 - **email**: `str`, уникальный email
 - **hashed_password**: `str`, хеш пароля (bcrypt)
 - **first_name**: `str`, имя
@@ -111,58 +111,40 @@ cd fastapi_jwt_template
 ### 2. Настройте переменные окружения
 Скопируйте `.env.example` в `.env` и обновите:
 ```env
-# Database
 DB_NAME=postgres
 DB_USER=postgres
 DB_PWD=postgres
-DB_HOST=localhost
-DB_PORT=5431
+DB_HOST=db
+DB_PORT=5432
 
-# Test Database
-TEST_DB_NAME=testdb
-TEST_DB_USER=testuser
-TEST_DB_PWD=testpass
-TEST_DB_HOST=localhost
-TEST_DB_PORT=5433
+TEST_DB_NAME=test_jwt_db
+TEST_DB_USER=postgres
+TEST_DB_PWD=postgres
+TEST_DB_HOST=test_db
+TEST_DB_PORT=5432
 
-# Redis
-REDIS_HOST=localhost
+PGADMIN_DEFAULT_EMAIL=admin@admin.com
+PGADMIN_DEFAULT_PASSWORD=admin
+
+REDIS_HOST=redis
 REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 
-# JWT
-SECRET_KEY=your-super-secret-key-change-in-production
+SECRET_KEY=your_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
-# pgAdmin
-PGADMIN_DEFAULT_EMAIL=admin@admin.com
-PGADMIN_DEFAULT_PASSWORD=admin
+LOCAL_APP=False - параметр для запуска app локально
 ```
 
-### 3. Запустите инфраструктуру
+### 2. Запустите Docker Compose
 ```bash
 docker-compose up -d 
 ```
 
-### 4. Установите зависимости
-```bash
-pip install -r requirements.txt
-```
-
-### 5. Примените миграции
-```bash
-alembic upgrade head
-```
-
-### 6. Запустите приложение
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-**Примечание**: Приложение пока не обернуто в Docker контейнер, запускается напрямую через uvicorn.
-
-### 7. Доступ к сервисам
+### 3. Доступ к сервисам
 - **Приложение**: `http://localhost:8000`
 - **Swagger UI**: `http://localhost:8000/docs`
 - **pgAdmin**: `http://localhost:8080` (логин: `admin@admin.com`, пароль: `admin`)
@@ -196,69 +178,85 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## Эндпоинты API
 
+> **Документация** также доступна в `Swagger UI`: http://localhost:8000/docs  
+> **Примечание:** аутентификация через форму в Swagger не работает.  
+> Рекомендуется использовать `Postman` или `curl` для тестирования.
+
 ### Аутентификация (`/api/v1/auth`)
 
-| Эндпоинт | Метод | Описание | Доступ |
-|----------|-------|----------|---------|
-| `/register` | POST | Регистрация нового пользователя | Публичный |
-| `/login` | POST | Аутентификация пользователя | Публичный |
-| `/refresh` | POST | Обновление `access_token` через куки | Публичный |
-| `/logout` | POST | Выход пользователя с отзывом токенов | Аутентифицированные |
+| Эндпоинт | Метод | Описание | Доступ | Ответ |
+|----------|-------|----------|--------|-------|
+| `/register` | **POST** | Регистрация нового пользователя | Публичный | **200** – данные пользователя (`id`, `username`, `email`, `first_name`, `last_name`, `middle_name`, `created_at`)<br>**400** – `Email already registered` или ошибки валидации |
+| `/login` | **POST** | Аутентификация пользователя | Публичный | **200** – `{access_token, token_type}` + `refresh_token` в `HttpOnly`-куке<br>**401** – `Invalid credentials` |
+| `/refresh` | **POST** | Обновление `access_token` через куку | Публичный (нужен `refresh_token`) | **200** – `{access_token, token_type}` + новый `refresh_token` в куке<br>**401** – `No refresh token provided` / `Invalid token` |
+| `/logout` | **POST** | Выход пользователя с отзывом токенов | Аутентифицированные (`access_token`) | **200** – `{"message":"Logged out successfully","tokens_revoked":{...}}`<br>**401** – `Not authenticated` |
+
+---
 
 ### Пользователи (`/api/v1/users`)
 
-| Эндпоинт | Метод | Описание | Доступ |
-|----------|-------|----------|---------|
-| `/me` | GET | Получение профиля текущего пользователя | Аутентифицированные |
-| `/me` | PATCH | Обновление профиля пользователя | Аутентифицированные |
-| `/deactivate` | DELETE | Деактивация аккаунта | Аутентифицированные |
+| Эндпоинт | Метод | Описание | Доступ | Ответ |
+|----------|-------|----------|--------|-------|
+| `/me` | **GET** | Получение профиля текущего пользователя | Аутентифицированные | **200** – полные данные пользователя (включая `is_active`)<br>**401** – `Not authenticated` / `User account is inactive` |
+| `/me` | **PATCH** | Обновление любых полей профиля (можно частично) | Аутентифицированные | **200** – обновлённые данные пользователя<br>**400** – ошибки валидации (например, email уже занят) |
+| `/deactivate` | **DELETE** | Мягкое удаление (деактивация) аккаунта | Аутентифицированные | **200** – `{"message":"User <email> deactivated"}`<br>**401** – `Not authenticated` |
 
-### Администрирование (`/api/v1/admin`)
+---
 
-| Эндпоинт | Метод | Описание | Доступ |
-|----------|-------|----------|---------|
-| `/moderation` | GET | Панель модерации | moderator, admin |
-| `/admin_panel` | GET | Админ-панель | admin |
+### Администрирование (`/api/v1/admin`) *(заглушки для проверки RBAC)*
+
+| Эндпоинт | Метод | Описание | Доступ | Ответ                                                                                                                                          |
+|----------|-------|----------|--------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/moderation` | **GET** | Панель модерации (доступна модераторам и админам) | `moderator` **или** `admin` | **200** – Приветсствие<br>**403** – `Insufficient permissions` |
+| `/admin_panel` | **GET** | Админ-панель (только админы) | `admin` | **200** – Приветсствие<br>**403** – `Insufficient permissions`                                                                                 |
+
+
+> **Примечание** – все ответы возвращаются в JSON-формате. Для запросов, требующих аутентификации, в заголовке `Authorization: Bearer <access_token>`.  
+> `refresh_token` хранится в `HttpOnly`-куке и автоматически подставляется браузером.  
+> При `logout` токены добавляются в blacklist (Redis) и кука `refresh_token` удаляется.
 
 ## Тестирование
 
 ### Запуск тестов
 ```bash
-pytest app/tests/ -v --cov=app --cov-report=term
+docker-compose exec app pytest app/tests -v --cov=app --cov-report=term
 ```
 
-### Покрытие тестами 88% кода.
+### Покрытие тестами 87% кода.
+```markdown
+Name                                    Stmts   Miss  Cover
+-----------------------------------------------------------
+app/__init__.py                             0      0   100%
+app/api/__init__.py                         0      0   100%
+app/api/v1/__init__.py                      0      0   100%
+app/api/v1/admin.py                        14      0   100%
+app/api/v1/auth.py                         50      2    96%
+app/api/v1/schemas.py                      50      1    98%
+app/api/v1/users.py                        22      3    86%
+app/core/__init__.py                        0      0   100%
+app/core/config.py                         48     10    79%
+app/core/database.py                       18      4    78%
+app/core/dependencies.py                   48      6    88%
+app/core/exceptions.py                     27      3    89%
+app/core/logging_config.py                 14      0   100%
+app/core/migrations.py                     27      6    78%
+app/core/redis.py                          32      7    78%
+app/core/security.py                      113     28    75%
+app/main.py                                40      5    88%
+app/models/__init__.py                      0      0   100%
+app/models/base.py                          4      0   100%
+app/models/rbac.py                         28      0   100%
+app/models/user.py                         17      0   100%
+app/repositories/__init__.py                0      0   100%
+app/repositories/rbac_repository.py        39     10    74%
+app/repositories/user_repository.py        27      7    74%
+app/services/__init__.py                    0      0   100%
+app/services/authorization_service.py      34      0   100%
+app/services/user_service.py               57      3    95%
+-----------------------------------------------------------
+TOTAL                                     709     95    87%
+```
 
-| Файл                            | Stmts | Miss | Cover |
-|--------------------------------|-------|------|-------|
-| app/__init__.py                | 0     | 0    | 100%  |
-| app/api/__init__.py            | 0     | 0    | 100%  |
-| app/api/v1/__init__.py         | 0     | 0    | 100%  |
-| app/api/v1/admin.py            | 14    | 0    | 100%  |
-| app/api/v1/auth.py             | 50    | 2    | 96%   |
-| app/api/v1/schemas.py          | 50    | 1    | 98%   |
-| app/api/v1/users.py            | 22    | 3    | 86%   |
-| app/core/__init__.py           | 0     | 0    | 100%  |
-| app/core/config.py             | 19    | 0    | 100%  |
-| app/core/database.py           | 18    | 4    | 78%   |
-| app/core/dependencies.py       | 48    | 6    | 88%   |
-| app/core/exceptions.py         | 27    | 3    | 89%   |
-| app/core/logging_config.py     | 14    | 0    | 100%  |
-| app/core/migrations.py         | 13    | 0    | 100%  |
-| app/core/redis.py              | 32    | 7    | 78%   |
-| app/core/security.py           | 113   | 28   | 75%   |
-| app/main.py                    | 40    | 5    | 88%   |
-| app/models/__init__.py         | 0     | 0    | 100%  |
-| app/models/base.py             | 4     | 0    | 100%  |
-| app/models/rbac.py             | 28    | 0    | 100%  |
-| app/models/user.py             | 17    | 0    | 100%  |
-| app/repositories/__init__.py   | 0     | 0    | 100%  |
-| app/repositories/rbac_repository.py | 39 | 10   | 74%   |
-| app/repositories/user_repository.py | 27 | 7    | 74%   |
-| app/services/__init__.py       | 0     | 0    | 100%  |
-| app/services/authorization_service.py | 34 | 0    | 100%  |
-| app/services/user_service.py   | 57    | 3    | 95%   |
-| **Итого**                      | **666** | **79** | **88%** |
 
 Основные тестовые сценарии:
 - Аутентификация и регистрация
@@ -330,29 +328,7 @@ curl -X GET http://localhost:8000/api/v1/admin/admin_panel \
 - Refresh токены хранятся в HttpOnly куках
 - Реализован blacklist отозванных токенов через Redis
 - Валидация входных данных через Pydantic
-- Защита от основных уязвимостей OWASP
 
-## Устранение неполадок
+## Примечание
 
-### Миграции не применяются автоматически
-```bash
-alembic upgrade head
-```
-
-### Redis недоступен
-Убедитесь, что Redis запущен:
-```bash
-docker-compose up redis -d
-```
-
-### Проблемы с подключением к БД
-Проверьте настройки в `.env` и убедитесь, что PostgreSQL запущен:
-```bash
-docker-compose up db -d
-```
-
-### Тесты не запускаются
-Убедитесь, что тестовая БД запущена:
-```bash
-docker-compose up test_db -d
-```
+- Миграция с тестовыми данными нужна для демонстрации, в дальнейшем нужно удалить тестовых пользователей
