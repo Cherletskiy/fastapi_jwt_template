@@ -5,8 +5,11 @@ from contextlib import asynccontextmanager
 from app.core.database import init_db, close_db
 from app.core.migrations import run_migrations
 from app.api.v1.auth import router as auth_router
+from app.api.v1.users import router as users_router
+from app.api.v1.admin import router as admin_router
 from app.core.exceptions import AppException, DatabaseException
 from app.core.logging_config import setup_logger
+from app.core.redis import redis_manager
 
 
 logger = setup_logger(__name__)
@@ -19,11 +22,13 @@ async def lifespan(app: FastAPI):
     try:
         await run_migrations()
         await init_db()
+        await redis_manager.init_redis()
         yield
     except Exception as e:
         logger.error(f"Error in lifespan: {e}")
     finally:
         logger.info("Stopping app")
+        await redis_manager.close_redis()
         await close_db()
 
 
@@ -33,6 +38,8 @@ app = FastAPI(
 
 
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 
 
 @app.exception_handler(AppException)

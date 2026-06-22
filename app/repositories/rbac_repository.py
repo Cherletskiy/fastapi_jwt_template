@@ -1,0 +1,72 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from typing import List
+
+from app.models.rbac import Role, Permission, UserRole, RolePermission
+from app.core.logging_config import setup_logger
+
+
+logger = setup_logger(__name__)
+
+
+class AuthorizationRepository:
+    @staticmethod
+    async def get_user_roles(session: AsyncSession, user_id: int) -> List[Role]:
+        """Все роли пользователя (объекты Role)."""
+        stmt = (
+            select(Role)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+        )
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+
+    @staticmethod
+    async def get_user_permissions(session: AsyncSession, user_id: int) -> List[Permission]:
+        """Все разрешения пользователя (объекты Permission)."""
+        stmt = (
+            select(Permission)
+            .join(RolePermission, RolePermission.permission_id == Permission.id)
+            .join(Role, Role.id == RolePermission.role_id)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+        )
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+
+    @staticmethod
+    async def get_user_permission_names(session: AsyncSession, user_id: int) -> List[str]:
+        """Список имён разрешений пользователя."""
+        perms = await AuthorizationRepository.get_user_permissions(session, user_id)
+        return [p.name for p in perms]
+
+
+    @staticmethod
+    async def get_role_by_name(session: AsyncSession, name: str) -> Role | None:
+        result = await session.execute(select(Role).filter_by(name=name))
+        return result.scalars().first()
+
+    @staticmethod
+    async def get_permission_by_name(session: AsyncSession, name: str) -> Permission | None:
+        result = await session.execute(select(Permission).filter_by(name=name))
+        return result.scalars().first()
+
+    @staticmethod
+    async def get_user_role_link(session: AsyncSession, user_id: int, role_id: int) -> UserRole | None:
+        """Проверяет есть ли связь пользователь-роль"""
+        stmt = select(UserRole).where(
+            UserRole.user_id == user_id,
+            UserRole.role_id == role_id
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create_user_role(session: AsyncSession, user_id: int, role_id: int) -> UserRole:
+        """Создает связь пользователь-роль"""
+        user_role = UserRole(user_id=user_id, role_id=role_id)
+        session.add(user_role)
+
+        return user_role

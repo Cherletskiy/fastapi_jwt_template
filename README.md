@@ -1,251 +1,332 @@
-# FastAPI JWT
+# FastAPI JWT RBAC Template
 
-REST API на FastAPI для реализации аутентификации на основе JWT с использованием `access_token` и `refresh_token` (хранится в `HttpOnly` куках). Поддерживает регистрацию, вход, обновление токенов, получение профиля и выход пользователя. Используется PostgreSQL для хранения данных и pgAdmin для администрирования БД.
+## Ветка rbac-auth для ТЗ Effective Mobile
+
+REST API на FastAPI для реализации аутентификации на основе JWT с системой ролей и разрешений (RBAC). Поддерживает регистрацию, вход, обновление токенов, управление профилем, мягкое удаление пользователей и контроль доступа на основе ролей.
+
 
 ## Возможности
-- Регистрация и вход пользователей с JWT-аутентификацией.
-- `access_token` (действует 30 минут) и `refresh_token` (действует 7 дней) в `HttpOnly` куках.
-- Эндпоинты: `/register`, `/login`, `/refresh`, `/refresh-body`, `/me`, `/logout`.
-- Интеграционные тесты с покрытием кода 81%.
-- Логирование запросов и ошибок.
-- Хеширование паролей с использованием bcrypt.
-- Упаковка в Docker с PostgreSQL и pgAdmin.
-- Swagger UI для документации API.
+
+- **Аутентификация JWT**: `access_token` (действует 30 минут) и `refresh_token` (действует 7 дней) в `HttpOnly` куках
+- **Система RBAC**: Роли (user, moderator, admin) и разрешения с гибкой настройкой прав доступа
+- **Управление пользователями**: 
+  - Расширенная модель пользователя (имя, фамилия, отчество)
+  - Мягкое удаление (деактивация) пользователей
+  - Обновление профиля
+- **Безопасность**:
+  - Хеширование паролей с использованием bcrypt
+  - Blacklist отозванных токенов через Redis
+  - Валидация данных через Pydantic
+- **Администрирование**: Панели модератора и администратора с разграничением прав доступа (пока без функционала)
+- **Тестирование**: Интеграционные тесты и юнит-тесты с покрытием кода 87%
+- **Логирование**: Детальное логирование запросов и ошибок
+- **Документация**: Swagger UI для интерактивной документации API
 
 ## Требования
-- Python 3.11+
-- Docker и Docker Compose
+
+- Python 3.12+
+- PostgreSQL 16-17
+- Redis 7+
 - Зависимости: указаны в `requirements.txt`
 
 ## Структура проекта
+
 ```
 fastapi_jwt_template/
 ├── app/
 │   ├── api/
 │   │   └── v1/
-│   │       ├── auth.py          # Эндпоинты аутентификации
-│   │       └── schemas.py       # Pydantic-схемы
+│   │       ├── admin.py          # Эндпоинты админ-панели
+│   │       ├── auth.py           # Эндпоинты аутентификации
+│   │       ├── schemas.py        # Pydantic-схемы
+│   │       └── users.py          # Эндпоинты пользователей
 │   ├── core/
-│   │   ├── config.py            # Настройки приложения
-│   │   ├── database.py          # Настройка БД
-│   │   ├── dependencies.py      # Зависимости FastAPI
-│   │   ├── exceptions.py        # Обработка исключений
-│   │   ├── logging_config.py    # Настройка логирования
-│   │   ├── migrations.py        # Миграции БД
-│   │   └── security.py          # Аутентификация
+│   │   ├── config.py             # Настройки приложения
+│   │   ├── database.py           # Настройка БД
+│   │   ├── dependencies.py       # Зависимости FastAPI
+│   │   ├── exceptions.py         # Обработка исключений
+│   │   ├── logging_config.py     # Настройка логирования
+│   │   ├── migrations.py         # Миграции БД
+│   │   ├── redis.py              # Redis клиент
+│   │   └── security.py           # Аутентификация и безопасность
 │   ├── models/
-│   │   └── user.py              # Модель пользователя
+│   │   ├── base.py               # Базовая модель
+│   │   ├── rbac.py               # Модели RBAC (роли, разрешения)
+│   │   └── user.py               # Модель пользователя
 │   ├── repositories/
-│   │   └── user_repository.py   # Репозиторий для работы с пользователями
+│   │   ├── rbac_repository.py    # Репозиторий для работы с RBAC
+│   │   └── user_repository.py    # Репозиторий для работы с пользователями
 │   ├── services/
-│   │   └── user_service.py      # Сервис для бизнес-логики
+│   │   ├── authorization_service.py  # Сервис авторизации RBAC
+│   │   └── user_service.py       # Сервис для бизнес-логики пользователей
 │   ├── tests/
-│   │   ├── conftest.py          # Конфигурация pytest
-│   │   └── test_auth.py         # Тесты
-│   └── main.py                  # Точка входа приложения, middleware (exception handler)
+│   │   ├── conftest.py           # Конфигурация pytest
+│   │   ├── test_auth_endpoints.py
+│   │   ├── test_authorization_service.py
+│   │   ├── test_integration.py
+│   │   ├── test_security_utils.py
+│   │   └── test_user_service.py
+│   └── main.py                   # Точка входа приложения
 ├── alembic/
-│   ├── versions/                # Файлы миграций
-│   └── env.py                   # Настройка Alembic
-├── .coveragerc                  # Настройка pytest-cov
-├── .env                         # Переменные окружения
-├── alembic.ini                  # Конфигурация Alembic
-├── Dockerfile                   # Docker-образ приложения
-├── docker-compose.yml           # Конфигурация Docker Compose
-├── requirements.txt             # Зависимости
-└── README.md                    # Документация
+│   ├── versions/                 # Файлы миграций
+│   └── env.py                    # Настройка Alembic
+├── .coveragerc                   # Настройка pytest-cov
+├── .env.example                  # Пример переменных окружения
+├── alembic.ini                   # Конфигурация Alembic
+├── docker-compose.yml            # Конфигурация Docker Compose
+├── Dockerfile                    # Docker-образ приложения
+├── requirements.txt              # Зависимости
+└── README.md                     # Документация
 ```
 
 ## Модель данных
-Модель `User` (таблица `users` в PostgreSQL):
-- **id**: `int`, первичный ключ, автоинкремент.
-- **username**: `str`, уникальное имя пользователя.
-- **email**: `str`, уникальный email.
-- **hashed_password**: `str`, хеш пароля (bcrypt).
-- **created_at**: `datetime`, дата создания записи.
+
+### Пользователь (`users` таблица)
+- **id**: `int`, первичный ключ, автоинкремент
+- **username**: `str`, nickname (пока заглушка, можно удалить или доработать)
+- **email**: `str`, уникальный email
+- **hashed_password**: `str`, хеш пароля (bcrypt)
+- **first_name**: `str`, имя
+- **last_name**: `str`, фамилия  
+- **middle_name**: `str`, отчество
+- **is_active**: `bool`, активен ли пользователь
+- **created_at**: `datetime`, дата создания записи
+
+### RBAC Модели
+- **roles**: Роли пользователей (user, moderator, admin)
+- **permissions**: Разрешения (profile:read, profile:write, users:read, users:write, admin:access)
+- **user_roles**: Связь пользователей с ролями
+- **role_permissions**: Связь ролей с разрешениями
 
 ## Установка и запуск
-1. **Клонируйте репозиторий**:
-   ```bash
-   git clone <repository_url>
-   cd fastapi_jwt_template
-   ```
 
-2. **Настройте переменные окружения**:
-   - Скопируйте `.env.example` в `.env` и обновите:
-     ```env
-     DB_HOST=db
-     DB_PORT=5432
-     DB_USER=your_user
-     DB_NAME=your_db
-     DB_PASSWORD=your_password
-     PGADMIN_DEFAULT_EMAIL=admin@admin.com
-     PGADMIN_DEFAULT_PASSWORD=admin
-     SECRET_KEY=your_secret_key
-     ALGORITHM=HS256
-     ACCESS_TOKEN_EXPIRE_MINUTES=30
-     REFRESH_TOKEN_EXPIRE_DAYS=7
-     ```
+### 1. Клонируйте репозиторий
+```bash
+git clone <repository_url>
+cd fastapi_jwt_template
+```
 
-3. **Установите зависимости** (опционально, для локального запуска):
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 2. Настройте переменные окружения
+Скопируйте `.env.example` в `.env` и обновите:
+```env
+DB_NAME=postgres
+DB_USER=postgres
+DB_PWD=postgres
+DB_HOST=db
+DB_PORT=5432
 
-4. **Запустите с помощью Docker**:
-   ```bash
-   docker-compose up -d
-   ```
-   - Приложение: `http://localhost:8000`
-   - Swagger UI: `http://localhost:8000/docs`
-   - pgAdmin: `http://localhost:5050` (логин: `admin@admin.com`, пароль: `admin`)
+TEST_DB_NAME=test_jwt_db
+TEST_DB_USER=postgres
+TEST_DB_PWD=postgres
+TEST_DB_HOST=test_db
+TEST_DB_PORT=5432
 
-5. **Запустите тесты**:
-   ```bash
-   docker-compose exec app pytest app/tests -v --cov=app --cov-report=term
-   ```
+PGADMIN_DEFAULT_EMAIL=admin@admin.com
+PGADMIN_DEFAULT_PASSWORD=admin
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+SECRET_KEY=your_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+
+LOCAL_APP=False - параметр для запуска app локально
+```
+
+### 2. Запустите Docker Compose
+```bash
+docker-compose up -d 
+```
+
+### 3. Доступ к сервисам
+- **Приложение**: `http://localhost:8000`
+- **Swagger UI**: `http://localhost:8000/docs`
+- **pgAdmin**: `http://localhost:8080` (логин: `admin@admin.com`, пароль: `admin`)
+
+## RBAC Система
+
+### Предустановленные роли и разрешения
+
+При миграции автоматически создаются:
+
+#### Роли:
+- **user**: Обычный пользователь
+- **moderator**: Модератор  
+- **admin**: Администратор
+
+#### Разрешения:
+- `profile:read` - Чтение профиля
+- `profile:write` - Редактирование профиля
+- `users:read` - Просмотр пользователей
+- `users:write` - Редактирование пользователей
+- `admin:access` - Доступ к админ-панели
+
+#### Назначения прав:
+- **user**: `profile:read`, `profile:write`
+- **moderator**: `profile:read`, `profile:write`, `users:read`
+- **admin**: Все разрешения
+
+#### Тестовые пользователи:
+- **user@example.com** / `password123` - роль `user`
+- **admin@example.com** / `password123` - роль `admin`
+
+## Эндпоинты API
+
+> **Документация** также доступна в `Swagger UI`: http://localhost:8000/docs  
+> **Примечание:** аутентификация через форму в Swagger не работает.  
+> Рекомендуется использовать `Postman` или `curl` для тестирования.
+
+### Аутентификация (`/api/v1/auth`)
+
+| Эндпоинт | Метод | Описание | Доступ | Ответ |
+|----------|-------|----------|--------|-------|
+| `/register` | **POST** | Регистрация нового пользователя | Публичный | **200** – данные пользователя (`id`, `username`, `email`, `first_name`, `last_name`, `middle_name`, `created_at`)<br>**400** – `Email already registered` или ошибки валидации |
+| `/login` | **POST** | Аутентификация пользователя | Публичный | **200** – `{access_token, token_type}` + `refresh_token` в `HttpOnly`-куке<br>**401** – `Invalid credentials` |
+| `/refresh` | **POST** | Обновление `access_token` через куку | Публичный (нужен `refresh_token`) | **200** – `{access_token, token_type}` + новый `refresh_token` в куке<br>**401** – `No refresh token provided` / `Invalid token` |
+| `/logout` | **POST** | Выход пользователя с отзывом токенов | Аутентифицированные (`access_token`) | **200** – `{"message":"Logged out successfully","tokens_revoked":{...}}`<br>**401** – `Not authenticated` |
+
+---
+
+### Пользователи (`/api/v1/users`)
+
+| Эндпоинт | Метод | Описание | Доступ | Ответ |
+|----------|-------|----------|--------|-------|
+| `/me` | **GET** | Получение профиля текущего пользователя | Аутентифицированные | **200** – полные данные пользователя (включая `is_active`)<br>**401** – `Not authenticated` / `User account is inactive` |
+| `/me` | **PATCH** | Обновление любых полей профиля (можно частично) | Аутентифицированные | **200** – обновлённые данные пользователя<br>**400** – ошибки валидации (например, email уже занят) |
+| `/deactivate` | **DELETE** | Мягкое удаление (деактивация) аккаунта | Аутентифицированные | **200** – `{"message":"User <email> deactivated"}`<br>**401** – `Not authenticated` |
+
+---
+
+### Администрирование (`/api/v1/admin`) *(заглушки для проверки RBAC)*
+
+| Эндпоинт | Метод | Описание | Доступ | Ответ                                                                                                                                          |
+|----------|-------|----------|--------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/moderation` | **GET** | Панель модерации (доступна модераторам и админам) | `moderator` **или** `admin` | **200** – Приветсствие<br>**403** – `Insufficient permissions` |
+| `/admin_panel` | **GET** | Админ-панель (только админы) | `admin` | **200** – Приветсствие<br>**403** – `Insufficient permissions`                                                                                 |
+
+
+> **Примечание** – все ответы возвращаются в JSON-формате. Для запросов, требующих аутентификации, в заголовке `Authorization: Bearer <access_token>`.  
+> `refresh_token` хранится в `HttpOnly`-куке и автоматически подставляется браузером.  
+> При `logout` токены добавляются в blacklist (Redis) и кука `refresh_token` удаляется.
+
+## Тестирование
+
+### Запуск тестов
+```bash
+docker-compose exec app pytest app/tests -v --cov=app --cov-report=term
+```
+
+### Покрытие тестами 87% кода.
+```markdown
+Name                                    Stmts   Miss  Cover
+-----------------------------------------------------------
+app/__init__.py                             0      0   100%
+app/api/__init__.py                         0      0   100%
+app/api/v1/__init__.py                      0      0   100%
+app/api/v1/admin.py                        14      0   100%
+app/api/v1/auth.py                         50      2    96%
+app/api/v1/schemas.py                      50      1    98%
+app/api/v1/users.py                        22      3    86%
+app/core/__init__.py                        0      0   100%
+app/core/config.py                         48     10    79%
+app/core/database.py                       18      4    78%
+app/core/dependencies.py                   48      6    88%
+app/core/exceptions.py                     27      3    89%
+app/core/logging_config.py                 14      0   100%
+app/core/migrations.py                     27      6    78%
+app/core/redis.py                          32      7    78%
+app/core/security.py                      113     28    75%
+app/main.py                                40      5    88%
+app/models/__init__.py                      0      0   100%
+app/models/base.py                          4      0   100%
+app/models/rbac.py                         28      0   100%
+app/models/user.py                         17      0   100%
+app/repositories/__init__.py                0      0   100%
+app/repositories/rbac_repository.py        39     10    74%
+app/repositories/user_repository.py        27      7    74%
+app/services/__init__.py                    0      0   100%
+app/services/authorization_service.py      34      0   100%
+app/services/user_service.py               57      3    95%
+-----------------------------------------------------------
+TOTAL                                     709     95    87%
+```
+
+
+Основные тестовые сценарии:
+- Аутентификация и регистрация
+- RBAC авторизация
+- Управление профилем пользователя
+- Интеграционные тесты полного цикла
+- Тесты безопасности
+
+## Ручное тестирование
+
+### 1. Регистрация пользователя
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com", 
+    "password": "Secure123",
+    "confirm_password": "Secure123",
+    "first_name": "Иван",
+    "last_name": "Петров",
+    "middle_name": "Сергеевич"
+  }'
+```
+
+### 2. Вход в систему
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "Secure123"}' \
+  -c cookies.txt
+```
+
+### 3. Получение профиля
+```bash
+curl -X GET http://localhost:8000/api/v1/users/me \
+  -H "Authorization: Bearer <access_token>"
+```
+
+### 4. Обновление профиля
+```bash
+curl -X PATCH http://localhost:8000/api/v1/users/me \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"first_name": "НовоеИмя"}'
+```
+
+### 5. Доступ к админ-панели (только для admin)
+```bash
+curl -X GET http://localhost:8000/api/v1/admin/admin_panel \
+  -H "Authorization: Bearer <access_token>"
+```
 
 ## Настройка pgAdmin
-- Доступ: `http://localhost:5050`
-- Логин: `PGADMIN_DEFAULT_EMAIL` (по умолчанию `admin@admin.com`)
-- Пароль: `PGADMIN_DEFAULT_PASSWORD` (по умолчанию `admin`)
-- Добавьте сервер PostgreSQL:
-  - Host: `db`
-  - Port: `5432`
-  - Username: `postgres` (из `.env`)
-  - Password: `postgres` (из `.env`)
-  - Database: `postgres` (из `.env`)
 
-## Описание эндпоинтов
-| Эндпоинт | Метод | Описание | Параметры | Ответ |
-|----------|-------|----------|-----------|-------|
-| `/api/v1/auth/register` | POST | Регистрация нового пользователя | JSON: `username`, `email`, `password` | 200: Данные пользователя (`id`, `username`, `email`, `created_at`) <br> 400: `Email already registered` |
-| `/api/v1/auth/login` | POST | Аутентификация пользователя | JSON: `email`, `password` | 200: `{access_token, token_type}` + `refresh_token` в `HttpOnly` куки <br> 401: `Invalid credentials` |
-| `/api/v1/auth/refresh` | POST | Обновление `access_token` через куки | `refresh_token` в куки | 200: `{access_token, token_type}` + новый `refresh_token` в куки <br> 401: `No refresh token provided` или `Invalid token` |
-| `/api/v1/auth/refresh-body` | POST | Обновление `access_token` через тело запроса | JSON: `token` (`refresh_token`) | 200: `{access_token, token_type}` + новый `refresh_token` в куки <br> 401: `Invalid token` |
-| `/api/v1/auth/me` | GET | Получение профиля текущего пользователя | Header: `Authorization: Bearer <access_token>` | 200: Данные пользователя (`id`, `username`, `email`, `created_at`) <br> 401: `Not authenticated` |
-| `/api/v1/auth/logout` | POST | Выход пользователя | Header: `Authorization: Bearer <access_token>` | 200: `{"message": "Logged out"}`, удаляет `refresh_token` из куки <br> 401: `Not authenticated` |
+1. Откройте `http://localhost:8080`
+2. Войдите с credentials из `.env`
+3. Добавьте сервер PostgreSQL:
+   - **Name**: Любое имя
+   - **Host**: `db` 
+   - **Port**: `5432`
+   - **Username**: `postgres` (из `.env`)
+   - **Password**: `postgres` (из `.env`)
 
-## Ручное тестирование эндпоинтов
-Используйте Postman, cURL или Swagger UI (`http://localhost:8000/docs`).
+## Безопасность
 
-### 1. Регистрация (`/register`)
-- **Запрос**:
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/auth/register \
-    -H "Content-Type: application/json" \
-    -d '{"username":"testuser","email":"test@example.com","password":"Secure123"}'
-  ```
-- **Ответ** (200):
-  ```json
-  {"id":1,"username":"testuser","email":"test@example.com","created_at":"2025-10-15T12:00:00"}
-  ```
-- **Ошибка** (400):
-  ```json
-  {"detail":"Email {email} already registered"}
-  ```
+- Пароли хешируются с использованием bcrypt
+- JWT токены подписываются секретным ключом
+- Refresh токены хранятся в HttpOnly куках
+- Реализован blacklist отозванных токенов через Redis
+- Валидация входных данных через Pydantic
 
-### 2. Вход (`/login`)
-- **Запрос**:
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{"email":"test@example.com","password":"Secure123"}' \
-    -c cookies.txt
-  ```
-- **Ответ** (200):
-  ```json
-  {"access_token":"eyJ...","token_type":"bearer"}
-  ```
-  - `refresh_token` в `cookies.txt` как `HttpOnly` куки.
-- **Ошибка** (401):
-  ```json
-  {"detail":"Invalid credentials"}
-  ```
+## Примечание
 
-### 3. Обновление токена (`/refresh`)
-- **Запрос**:
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/auth/refresh \
-    -b cookies.txt \
-    -c cookies.txt
-  ```
-- **Ответ** (200):
-  ```json
-  {"access_token":"eyJ...","token_type":"bearer"}
-  ```
-  - Новый `refresh_token` в куки.
-- **Ошибка** (401):
-  ```json
-  {"detail":"Invalid token"}
-  ```
-
-### 4. Получение профиля (`/me`)
-- **Запрос**:
-  ```bash
-  curl -X GET http://localhost:8000/api/v1/auth/me \
-    -H "Authorization: Bearer <access_token>"
-  ```
-- **Ответ** (200):
-  ```json
-  {"id":1,"username":"testuser","email":"test@example.com","created_at":"2025-10-15T12:00:00"}
-  ```
-- **Ошибка** (401):
-  ```json
-  {"detail":"Not authenticated"}
-  ```
-
-### 6. Выход (`/logout`)
-- **Запрос**:
-  ```bash
-  curl -X POST http://localhost:8000/api/v1/auth/logout \
-    -H "Authorization: Bearer <access_token>" \
-    -c cookies.txt
-  ```
-- **Ответ** (200):
-  ```json
-  {"message":"Logged out"}
-  ```
-  - Удаляет `refresh_token` из куки.
-- **Ошибка** (401):
-  ```json
-  {"detail":"Not authenticated"}
-  ```
-
-### Тестирование в Swagger
-1. Откройте `http://localhost:8000/docs`.
-2. Нажмите **Authorize** (иконка замка), введите `access_token` из `/login` для `/me` и `/logout`.
-3. Для `/refresh-body` используйте `refresh_token` из DevTools (Application → Cookies).
-
-## Покрытие тестами
-Тесты покрывают 81% кода. Отчёт:
-
-| Файл                            | Строк | Пропущено | Покрытие |
-|--------------------------------|-------|-----------|----------|
-| app/__init__.py                | 0     | 0         | 100%     |
-| app/api/__init__.py            | 0     | 0         | 100%     |
-| app/api/v1/__init__.py         | 0     | 0         | 100%     |
-| app/api/v1/auth.py             | 51    | 0         | 100%     |
-| app/api/v1/schemas.py          | 26    | 1         | 96%      |
-| app/core/__init__.py           | 0     | 0         | 100%     |
-| app/core/config.py             | 15    | 0         | 100%     |
-| app/core/database.py           | 18    | 9         | 50%      |
-| app/core/dependencies.py       | 29    | 0         | 100%     |
-| app/core/logging_config.py     | 14    | 0         | 100%     |
-| app/core/migrations.py         | 13    | 8         | 38%      |
-| app/core/security.py           | 56    | 10        | 82%      |
-| app/main.py                    | 20    | 9         | 55%      |
-| app/models/__init__.py         | 0     | 0         | 100%     |
-| app/models/user.py             | 13    | 0         | 100%     |
-| app/repositories/__init__.py   | 0     | 0         | 100%     |
-| app/repositories/user_repository.py | 21 | 9      | 57%      |
-| app/services/__init__.py       | 0     | 0         | 100%     |
-| app/services/user_service.py   | 34    | 12        | 65%      |
-| **Итого**                      | **310** | **58**  | **81%**  |
-P.S. Тесты в разработке, поэтому в последнем коммите могут быть другие данные.
-
-## Планы доработки
-- Добавить rate-limiting для `/login` (защита от brute-force).
-- Добавить blacklist токенов для `/logout`.
-- Добавить docstring.
-- Увеличить покрытие тестов, разбить тесты на несколько файлов. 
-- CI/CD.
+- Миграция с тестовыми данными нужна для демонстрации, в дальнейшем нужно удалить тестовых пользователей

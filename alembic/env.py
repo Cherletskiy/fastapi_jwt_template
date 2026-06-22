@@ -1,8 +1,9 @@
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-from app.models.user import Base
+from app.models.base import Base
 from app.core.config import settings
+from app.models import user, rbac # без импорта не работала автогенерация
 
 # Инициализация Alembic config
 config = context.config
@@ -11,9 +12,6 @@ config = context.config
 sync_dsn = settings.DSN.replace("postgresql+asyncpg", "postgresql")
 config.set_main_option("sqlalchemy.url", sync_dsn)
 
-# # для локального тестирования
-# sync_dsn = f"postgresql://{settings.DB_USER}:{settings.DB_PASSWORD}@localhost:5431/{settings.DB_NAME}"
-# config.set_main_option("sqlalchemy.url", sync_dsn)
 
 # Метаданные для автогенерации миграций
 target_metadata = Base.metadata

@@ -23,13 +23,28 @@ class UserRepository:
 
     @staticmethod
     async def create_user(
-        session: AsyncSession, username: str, email: str, hashed_password: str
+            session: AsyncSession,
+            username: str,
+            email: str,
+            first_name: str,
+            last_name: str,
+            middle_name: str,
+            hashed_password: str
     ) -> User:
         try:
-            user = User(username=username, email=email, hashed_password=hashed_password)
+            user = User(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                middle_name=middle_name,
+                hashed_password=hashed_password
+            )
+
             session.add(user)
-            await session.commit()
+            await session.flush()
             await session.refresh(user)
             return user
         except IntegrityError as e:
+            await session.rollback()
             raise DatabaseException(internal_detail=str(e))

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_async_session, get_current_user, get_refresh_token
+from app.core.dependencies import get_async_session, get_current_user, get_refresh_token, oauth2_scheme
 from app.core.security import AuthService
 from app.services.user_service import UserService
 from app.api.v1.schemas import UserCreate, UserLogin, UserResponse, TokenResponse
@@ -30,7 +30,13 @@ async def register(
 ):
     hashed_password = AuthService.get_password_hash(user_data.password)
     user = await UserService.create_user(
-        session, user_data.username, user_data.email, hashed_password
+        session,
+        user_data.username,
+        user_data.email,
+        user_data.first_name,
+        user_data.last_name,
+        user_data.middle_name,
+        hashed_password
     )
     logger.info(f"User registered: {user.email}")
     return user
@@ -73,15 +79,38 @@ async def refresh_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
-    logger.info(f"User accessed /me: {current_user.email}")
-    return current_user
-
-
 @router.post("/logout")
-async def logout(response: Response, current_user: User = Depends(get_current_user)):
+async def logout(
+        request: Request,
+        response: Response,
+        current_user: User = Depends(get_current_user)
+):
+    """Выход пользователя с отзывом токенов"""
+    access_revoked = False
+    refresh_revoked = False
+
+    try:
+        access_token = await oauth2_scheme(request)
+        access_revoked = await AuthService.add_to_blacklist(access_token, "access")
+        refresh_token = request.cookies.get("refresh_token")
+
+        if refresh_token:
+            refresh_revoked = await AuthService.add_to_blacklist(refresh_token, "refresh")
+
+        logger.info(f"User logged out: {current_user.email}, "
+                    f"access_revoked: {access_revoked}, "
+                    f"refresh_revoked: {refresh_revoked}")
+
+    except Exception as e:
+        logger.error(f"Error during token revocation: {e}")
+
     response.delete_cookie("refresh_token")
 
-    logger.info(f"User logged out: {current_user.email}")
-    return {"message": "Logged out"}
+    return {
+        "message": "Logged out successfully",
+        "tokens_revoked": {
+            "access": access_revoked,
+            "refresh": refresh_revoked
+        },
+        "note": "Access token is now invalid. Refresh token removed from cookies."
+    }
